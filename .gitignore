@@ -171,3 +171,5 @@ cython_debug/
 .pypirc
 .DS_Store
 lambda_project/function.zip
+lambda_project/python
+credentials.json
