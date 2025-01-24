@@ -7,20 +7,20 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 import json
-import os
 import hashlib
-
+from flask import Flask, jsonify
 
 # Global Constants
 REGION_NAME = "us-east-1"
 FOLDER_ID = "1drnXtVxi5-yEu117ukZril1AZfodZ1cW"  # Google Drive folder ID
 SECRET_NAME = "GoogleDriveCredentials"  # AWS Secrets Manager secret name
 
-
 # Initialize DynamoDB connection
 dynamodb = boto3.resource('dynamodb', region_name=REGION_NAME)
 table = dynamodb.Table('Transactions')
 
+# Initialize Flask app
+app = Flask(__name__)
 
 # Load Google Drive Credentials from Secrets Manager
 def load_google_credentials():
@@ -32,7 +32,6 @@ def load_google_credentials():
         credentials_info, scopes=["https://www.googleapis.com/auth/drive"]
     )
     return creds
-
 
 # Download XLS from Google Drive
 def download_xls_from_drive():
@@ -67,7 +66,6 @@ def download_xls_from_drive():
         df = pd.read_excel(fh)
         process_transactions_from_df(df)
 
-
 # Process and Insert Transactions into DynamoDB
 def process_transactions_from_df(df):
     required_columns = ['Date', 'Category', 'Sub Category', 'Credit', 'Debit', 'Note']
@@ -95,8 +93,7 @@ def generate_transaction_id(date, category, sub_category, credit, debit, note):
     transaction_hash = hashlib.sha256(transaction_string.encode()).hexdigest()
     return transaction_hash
 
-
-# Insert transaction in dynamo
+# Insert transaction in DynamoDB
 def insert_transaction(date, category, sub_category, credit, debit, note):
     # Generate transaction_id based on transaction details
     transaction_id = generate_transaction_id(date, category, sub_category, credit, debit, note)
@@ -115,15 +112,15 @@ def insert_transaction(date, category, sub_category, credit, debit, note):
     table.put_item(Item=transaction)
     print(f"Inserted or updated transaction: {transaction}")
 
+# Flask route to trigger the process
+@app.route('/process_transactions', methods=['GET'])
+def process_transactions():
+    try:
+        download_xls_from_drive()
+        return jsonify({"status": "success", "message": "Transactions imported successfully."}), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
-
-# Lambda Handler
-def lambda_handler(event, context):
-    download_xls_from_drive()
-    return {
-        "statusCode": 200,
-        "body": "Transactions imported successfully."
-    }
-
+# Run Flask app
 if __name__ == "__main__":
-    lambda_handler({}, None)
+    app.run(host="0.0.0.0", port=8080)
