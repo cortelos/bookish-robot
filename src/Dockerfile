@@ -7,5 +7,6 @@ COPY requirements.txt requirements.txt
 RUN pip install -r requirements.txt
 
 COPY app.py app.py
+COPY download_transactions.py download_transactions.py
 
 CMD ["python", "app.py"]
