@@ -8,7 +8,12 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 import json
 import hashlib
-from flask import Flask, jsonify
+import time
+import threading
+from flask import Flask, request, jsonify
+import signal
+import sys
+import os
 
 # Global Constants
 REGION_NAME = "us-east-1"
@@ -22,6 +27,10 @@ table = dynamodb.Table('Transactions')
 # Initialize Flask app
 app = Flask(__name__)
 
+last_request_time = time.time()
+IDLE_TIMEOUT = int(os.getenv('IDLE_TIMEOUT', 300))  # Default to 5 minutes (300 seconds)
+
+
 # Load Google Drive Credentials from Secrets Manager
 def load_google_credentials():
     client = boto3.client('secretsmanager', region_name=REGION_NAME)
@@ -32,6 +41,7 @@ def load_google_credentials():
         credentials_info, scopes=["https://www.googleapis.com/auth/drive"]
     )
     return creds
+
 
 # Download XLS from Google Drive
 def download_xls_from_drive():
@@ -66,6 +76,7 @@ def download_xls_from_drive():
         df = pd.read_excel(fh)
         process_transactions_from_df(df)
 
+
 # Process and Insert Transactions into DynamoDB
 def process_transactions_from_df(df):
     required_columns = ['Date', 'Category', 'Sub Category', 'Credit', 'Debit', 'Note']
@@ -85,6 +96,7 @@ def process_transactions_from_df(df):
             note=row['Note'] if not pd.isna(row['Note']) else ""
         )
 
+
 # Generate a hash-based transaction_id
 def generate_transaction_id(date, category, sub_category, credit, debit, note):
     # Concatenate all fields into a single string
@@ -92,6 +104,7 @@ def generate_transaction_id(date, category, sub_category, credit, debit, note):
     # Hash the string using SHA-256
     transaction_hash = hashlib.sha256(transaction_string.encode()).hexdigest()
     return transaction_hash
+
 
 # Insert transaction in DynamoDB
 def insert_transaction(date, category, sub_category, credit, debit, note):
@@ -112,15 +125,69 @@ def insert_transaction(date, category, sub_category, credit, debit, note):
     table.put_item(Item=transaction)
     print(f"Inserted or updated transaction: {transaction}")
 
+
 # Flask route to trigger the process
 @app.route('/process_transactions', methods=['GET'])
 def process_transactions():
-    try:
-        download_xls_from_drive()
-        return jsonify({"status": "success", "message": "Transactions imported successfully."}), 200
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+    """Mock processing of transactions."""
+    update_last_request_time()
 
-# Run Flask app
+    # Simulate processing
+    print(f"Processing request from: {request.remote_addr}")
+    download_xls_from_drive()
+    
+    # Return a simple message
+    return jsonify({
+        "status": "success",
+        "message": "Transaction processing triggered successfully."
+    })
+
+
+@app.route('/shutdown', methods=['POST'])
+def shutdown():
+    """Endpoint to manually shut down the service."""
+    update_last_request_time()
+    shutdown_server()
+    return "Server shutting down..."
+
+
+def update_last_request_time():
+    """Update the timestamp of the last received request."""
+    global last_request_time
+    last_request_time = time.time()
+
+
+def shutdown_server():
+    """Gracefully shutdown the Flask server."""
+    func = request.environ.get('werkzeug.server.shutdown')
+    if func is None:
+        raise RuntimeError("Not running with the Werkzeug Server")
+    func()
+
+
+def monitor_idle_time():
+    """Monitor idle time and exit if no requests received within timeout."""
+    global last_request_time
+    while True:
+        time.sleep(10)  # Check every 10 seconds
+        if time.time() - last_request_time > IDLE_TIMEOUT:
+            print(f"Shutting down due to {IDLE_TIMEOUT} seconds of inactivity.")
+            os.kill(os.getpid(), signal.SIGINT)
+
+
+def signal_handler(sig, frame):
+    """Handle shutdown signals gracefully."""
+    print("Shutting down gracefully...")
+    sys.exit(0)
+
+
 if __name__ == "__main__":
+    # Handle SIGINT and SIGTERM signals for clean shutdown
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+
+    # Start idle monitoring in a separate thread
+    threading.Thread(target=monitor_idle_time, daemon=True).start()
+
+    # Run Flask server
     app.run(host="0.0.0.0", port=8080)
