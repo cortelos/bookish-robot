@@ -17,6 +17,7 @@ SECRET_NAME = "GoogleDriveCredentials"  # AWS Secrets Manager secret name
 dynamodb = boto3.resource('dynamodb', region_name=REGION_NAME)
 table = dynamodb.Table('Transactions')
 
+
 # Load Google Drive Credentials from Secrets Manager
 def load_google_credentials():
     client = boto3.client('secretsmanager', region_name=REGION_NAME)
@@ -27,6 +28,7 @@ def load_google_credentials():
         credentials_info, scopes=["https://www.googleapis.com/auth/drive"]
     )
     return creds
+
 
 # Download XLS from Google Drive
 def download_xls_from_drive():

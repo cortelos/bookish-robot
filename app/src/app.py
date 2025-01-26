@@ -5,6 +5,7 @@ import signal
 import sys
 import os
 from download_transactions import download_xls_from_drive
+from export_transactions import export_transactions_to_s3
 from common import *
 
 # Initialize Flask app
@@ -19,9 +20,9 @@ def process_transactions():
     """Mock processing of transactions."""
     update_last_request_time()
 
-    # Simulate processing
     print(f"Processing request from: {request.remote_addr}")
-    download_xls_from_drive()
+    # download_xls_from_drive()
+    export_transactions_to_s3()
     
     # Return a simple message
     return jsonify({
