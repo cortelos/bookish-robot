@@ -2,11 +2,10 @@ FROM python:3.9-slim
 
 WORKDIR /app
 
-COPY requirements.txt requirements.txt
+COPY src/requirements.txt requirements.txt
 
 RUN pip install -r requirements.txt
 
-COPY app.py app.py
-COPY download_transactions.py download_transactions.py
+COPY src/*.py .
 
 CMD ["python", "app.py"]
