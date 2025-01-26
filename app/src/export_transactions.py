@@ -41,32 +41,23 @@ def export_transactions_to_s3():
         category = item['category']['S']
         sub_category = item.get('sub_category', {}).get('S', 'Unknown')  # Default to 'Unknown' if sub_category is missing
         note = item.get('note', {}).get('S', '')  # Default to empty string if note is missing
-        
-        # Use both category and sub_category as item_id
-        item_id = f"{category}-{sub_category}"
-        
-        # Credit is positive, Debit is negative
         credit = float(item['credit']['N']) if 'credit' in item else 0.0
         debit = float(item['debit']['N']) if 'debit' in item else 0.0
-        # Target value will be credit (positive) - debit (negative)
-        target_value = credit - debit
         
         # Add the data to csv
         csv_data.append({
             'transaction_id': transaction_id,
             'timestamp': formatted_date,
-            'item_id': item_id,  # Use category and sub_category as item_id
             'category': category,
             'sub_category': sub_category,
             'credit': credit,
             'debit': debit,
-            'note': note,
-            'target_value': target_value
+            'note': note
         })
 
     # Write to CSV in memory
     csv_buffer = io.StringIO()
-    csv_writer = csv.DictWriter(csv_buffer, fieldnames=['transaction_id', 'timestamp', 'item_id', 'category', 'sub_category', 'credit', 'debit', 'note', 'target_value'])
+    csv_writer = csv.DictWriter(csv_buffer, fieldnames=['transaction_id', 'timestamp', 'category', 'sub_category', 'credit', 'debit', 'note'])
     csv_writer.writeheader()
     csv_writer.writerows(csv_data)
 
