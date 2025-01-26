@@ -13,7 +13,6 @@ app = Flask(__name__)
 last_request_time = time.time()
 IDLE_TIMEOUT = int(os.getenv('IDLE_TIMEOUT', 300))  # Default to 5 minutes (300 seconds)
 
-
 # Flask route to trigger the process
 @app.route('/process_transactions', methods=['GET'])
 def process_transactions():
