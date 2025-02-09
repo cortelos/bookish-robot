@@ -1,1 +1,0 @@
-REGION_NAME = "us-east-1"
